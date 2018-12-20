@@ -21,32 +21,10 @@ class AssociationRuleMining:
                     self.__max_k = len(transaction)
 
     @staticmethod
-    def __enumerate_k_itemset(transaction, k=0):
-        """Enumerate k-itemset in a transaction.
-
-        Using back tracking algorithm to enumerate all combination of k-itemset.
-        This method is entended to be private.
-
-        Args:
-            transaction (list of item): Target to be enumerated, item can be either encoded or decoded.
-            k (int): Size of itemset.
-
-        Returns:
-            list of k-itemset: all k-itemset will be in list form.
-        """
-        all_k_itemset = []
-        # Recursive end condition.
-        if k > len(transaction):
-            pass
-        elif k == 1:
-            for item in transaction:
-                all_k_itemset.append([item])
-        else:
-            for i in range(len(transaction)):
-                for k_1_itemset in AssociationRuleMining.__enumerate_k_itemset(transaction[i+1:], k-1):
-                    k_itemset = [transaction[i]] + k_1_itemset
-                    all_k_itemset.append(k_itemset)
-        return all_k_itemset
+    def __join(itemsetA, itemsetB):
+        join_itemset = list(set(itemsetA) | set(itemsetB))
+        join_itemset.sort()
+        return join_itemset
 
     @staticmethod
     def __split_itemset(itemset):
@@ -120,18 +98,31 @@ class AssociationRuleMining:
             raise ValueError('k should be greater than 0.')
         if k > self.__max_k:
             raise ValueError('k should be smaller than or equal to max_k={}.'.format(self.__max_k))
-
         # Get frequent k-itemset from previous cahced computation result.
         if k in self.__frequent_k_itemset:
             pass
-        else:
-            # Compute.
-            self.__frequent_k_itemset[k] = set()
+        elif k == 1:
+            self.__frequent_k_itemset[1] = set()
             for transaction in self.__encoded_transactions:
-                for k_itemset in AssociationRuleMining.__enumerate_k_itemset(transaction, k):
-                    decoded_k_itemset = self.__item_encoder.decode_to_string_list(k_itemset)
-                    if self.support(decoded_k_itemset) >= self.__min_sup:
-                        self.__frequent_k_itemset[k].add(self.__itemset_encoder.encode_from_list(k_itemset))
+                for item in transaction:
+                    one_itemset = [item]
+                    decoded_1_itemset = self.__item_encoder.decode_to_string_list(one_itemset)
+                    if self.support(decoded_1_itemset) >= self.__min_sup:
+                        self.__frequent_k_itemset[1].add(self.__itemset_encoder.encode_from_list(one_itemset))
+        else:
+            self.__frequent_k_itemset[k] = set()
+            frequent_k_1_itemset = list(self.__frequent_k_itemset[k-1])
+            n = len(frequent_k_1_itemset)
+            for i in range(n-1):
+                k_1_itemsetA = self.__itemset_encoder.decode_to_list(frequent_k_1_itemset[i])
+                for j in range(i+1, n):
+                    k_1_itemsetB = self.__itemset_encoder.decode_to_list(frequent_k_1_itemset[j])
+                    if len(set(k_1_itemsetA) & set(k_1_itemsetB)) != k-2:
+                        continue
+                    candidate_k_itemset = AssociationRuleMining.__join(k_1_itemsetA, k_1_itemsetB)
+                    decoded_candidate_k_itemset = self.__item_encoder.decode_to_string_list(candidate_k_itemset)
+                    if self.support(decoded_candidate_k_itemset) >= self.__min_sup:
+                        self.__frequent_k_itemset[k].add(self.__itemset_encoder.encode_from_list(candidate_k_itemset))
 
         return [self.__item_encoder.decode_to_string_list(self.__itemset_encoder.decode_to_list(k_itemset))
             for k_itemset in self.__frequent_k_itemset[k]]
