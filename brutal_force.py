@@ -180,16 +180,16 @@ class AssociationRuleMining:
         return self.support_count(itemset) / self.__n_transactions
 
     def confidence(self, itemset_1, itemset_2):
-        """Confidence of association rule itemset_1 -> imtemsetB.
+        """Confidence of association rule `itemset_1` -> `itemset_2`.
 
-        If itemset_1 or itemset_2 is already encoded before input,
+        If `itemset_1` or `itemset_2` is already encoded before input,
         it will be given a zero confidence as return.
 
         Args:
             itemset_1 (list of item):
                 Denominator of confidence formula.
             itemset_2 (list of item):
-                Combine with itemset_1 to form nominator of confidence formula.
+                Combine with `itemset_1` to form nominator of confidence formula.
 
         Returns:
             float:
