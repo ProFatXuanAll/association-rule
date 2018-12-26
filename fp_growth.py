@@ -1,16 +1,17 @@
 """Module for association rules generation.
 
-Use class AssociationRuleMining to generate association rules,
+Use class `AssociationRuleMining` to generate association rules,
 see test section for code example.
 """
 
 from encoder import StringToIntegerEncoder, ListToIntegerEncoder
+import json
 
 class AssociationRuleMining:
-    """Use brutal force algorithm to generate association rule.
+    """Generate association rule with FP-Growth algorithm.
 
-    This class does not use any other algorithm to speed up association rule
-    generation process, can be consider as baseline for association rule generation.
+    This class use FP-Growth algorithm to speed up frequent itemsets generation,
+    thus speed up association rule generation.
     """
 
     def __init__(self, transactions=None, min_sup=0.1, min_cof=0.1, max_k=0):
@@ -30,6 +31,7 @@ class AssociationRuleMining:
         self.__min_sup = min_sup
         self.__min_cof = min_cof
         self.__sup_count = {}
+        self.__fp_tree = {}
         self.__frequent_k_itemset = {}
         self.__association_rules = []
         self.__item_encoder = StringToIntegerEncoder()
@@ -42,13 +44,10 @@ class AssociationRuleMining:
                                        .encode_from_list_of_string_list(transactions))
         self.__n_transactions = len(transactions)
         self.__max_k = max_k
-
-        # If max_k is not given or wrong, set to the largest transaction size.
         if self.__max_k <= 0:
             for transaction in self.__transactions:
                 if self.__max_k < len(transaction):
                     self.__max_k = len(transaction)
-
     @staticmethod
     def __enumerate_k_itemset(transaction, k=0):
         """Enumerate k-itemset in a transaction.
@@ -109,7 +108,6 @@ class AssociationRuleMining:
 
         # First way to split: 1-itemset & k-1-items
         all_split.append(([itemset[0]], itemset[1:]))
-
         for front, back in AssociationRuleMining.__split_itemset(itemset[1:]):
             # Second way to split: 1-itemset + k-n-1-itemset & n-itemset
             # Keep order by put 1-itemset at front.
@@ -180,7 +178,7 @@ class AssociationRuleMining:
     def confidence(self, itemset_1, itemset_2):
         """Confidence of association rule `itemset_1` -> `itemset_2`.
 
-        If `itemset_1` or `itemset_2` is already encoded before input,
+        If `itemset_`1 or `itemset_2` is already encoded before input,
         it will be given a zero confidence as return.
 
         Args:
@@ -196,11 +194,84 @@ class AssociationRuleMining:
 
         return self.support_count(itemset_1 + itemset_2) / self.support_count(itemset_1)
 
+    def construct_fp_tree(self):
+        # If fp tree is contructed.
+        if self.__fp_tree:
+            pass
+        # Else construct fp tree
+        else:
+            for i in range(self.__max_k):
+                self.__frequent_k_itemset[i+1] = set()
+
+            # convert to new transactions with only frequent 1-itemset
+            new_transactions = []
+            for transaction in self.__encoded_transactions:
+                new_transaction = []
+                for item in transaction:
+                    decoded_1_itemset = [self.__item_encoder.decode_to_string(item)]
+                    if self.support(decoded_1_itemset) >= self.__min_sup:
+                        new_transaction.append(item)
+                if new_transaction:
+                    new_transaction.sort()
+                    new_transaction.sort(key=lambda item: self.support_count([self.__item_encoder.decode_to_string(item)]), reverse=True)
+                    new_transactions.append(new_transaction)
+
+            # construct fp tree and header table
+            header_table = {}
+            thread_table = {}
+            for transaction in new_transactions:
+                current_node = self.__fp_tree
+                parent_node = ''
+                for item in transaction:
+                    if item not in current_node:
+                        current_node[item] = {'value': 1, 'child': {}, 'parent': parent_node}
+                        if item not in header_table:
+                            header_table[item] = current_node[item]
+
+                        if item in thread_table:
+                            thread_table[item]['next'] = current_node[item]
+                        thread_table[item] = current_node[item]
+                    else:
+                        current_node[item]['value'] = current_node[item]['value'] + 1
+                    parent_node = parent_node + ' ' + str(item)
+                    current_node = current_node[item]['child']
+
+            # fp-growth
+            for item, head_node in header_table.items():
+                counter = {}
+
+                while True:
+                    if head_node['parent']:
+                        parents = map(int, head_node['parent'][1:].split(' '))
+                        for parent in parents:
+                            if parent in counter:
+                                counter[parent] = counter[parent] + head_node['value']
+                            else:
+                                counter[parent] = head_node['value']
+                    if 'next' in head_node:
+                        head_node = head_node['next']
+                    else:
+                        break
+
+                pattern = []
+                for parent, support_count in counter.items():
+                    if support_count >= self.__min_sup * self.__n_transactions:
+                        pattern.append(parent)
+
+                self.__frequent_k_itemset[1].add(self.__itemset_encoder.encode_from_list([item]))
+                for k in range(len(pattern)):
+                    for k_itemset in AssociationRuleMining.__enumerate_k_itemset(pattern, k+1):
+                        k_plus_1_itemset = k_itemset + [item]
+                        encoded_itemset = self.__itemset_encoder.encode_from_list(k_plus_1_itemset)
+                        self.__frequent_k_itemset[len(k_plus_1_itemset)].add(encoded_itemset)
+                        self.__sup_count[encoded_itemset] = min(map(lambda key: counter[key], k_itemset))
+
     def frequent_k_itemset(self, k=1):
         """Frequent k-itemset of the transactions.
 
         If support of an k-itemset is greater than minimum support threshold,
         it will be in the list of frequent k-itemset.
+        Using Apriori algorithm to generate candidate frequent itemsets.
 
         Args:
             k (int):
@@ -224,20 +295,9 @@ class AssociationRuleMining:
         # If already calculated before, skip the calculation process.
         if k in self.__frequent_k_itemset:
             pass
-        # Else enumerate all k-itemset in each transaction and calculate support.
+        # Else use Apriori algorithm to generate frequent k-itemset.
         else:
-            self.__frequent_k_itemset[k] = set()
-            for transaction in self.__encoded_transactions:
-                for k_itemset in AssociationRuleMining.__enumerate_k_itemset(transaction, k):
-                    # Decode items in itemset because support function need items to be decoded.
-                    decoded_k_itemset = self.__item_encoder.decode_to_string_list(k_itemset)
-
-                    # If itemset satisfying minimum support, then it's a frequent itemset.
-                    if self.support(decoded_k_itemset) >= self.__min_sup:
-                        # Encode itemset to minimize memory usage.
-                        (self
-                         .__frequent_k_itemset[k]
-                         .add(self.__itemset_encoder.encode_from_list(k_itemset)))
+            self.construct_fp_tree()
 
         # Frequent k-itemset cached result.
         return [self
@@ -316,6 +376,9 @@ if __name__ == '__main__':
         ARM = AssociationRuleMining(transactions=json.loads(f.read()),
                                     min_sup=3/5,
                                     min_cof=0.5)
+
+        # ARM.construct_fp_tree()
+
 
         # Print support count for all frequent itemsets.
         for fi in ARM.frequent_itemset():

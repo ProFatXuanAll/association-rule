@@ -4,8 +4,6 @@ Use class `AssociationRuleMining` to generate association rules,
 see test section for code example.
 """
 
-import json
-import os
 from encoder import StringToIntegerEncoder, ListToIntegerEncoder
 
 class AssociationRuleMining:
@@ -315,6 +313,8 @@ class AssociationRuleMining:
 
 # Test section.
 if __name__ == '__main__':
+    import json
+    import os
     # Load data.
     DATA_PATH = os.path.dirname(os.path.abspath(__file__)) + '/data'
     DATA_NAME = '/example.json'
