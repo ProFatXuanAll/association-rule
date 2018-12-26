@@ -48,6 +48,7 @@ class AssociationRuleMining:
             for transaction in self.__transactions:
                 if self.__max_k < len(transaction):
                     self.__max_k = len(transaction)
+
     @staticmethod
     def __enumerate_k_itemset(transaction, k=0):
         """Enumerate k-itemset in a transaction.
@@ -195,15 +196,20 @@ class AssociationRuleMining:
         return self.support_count(itemset_1 + itemset_2) / self.support_count(itemset_1)
 
     def construct_fp_tree(self):
-        # If fp tree is contructed.
+        """Construct fp tree.
+
+        This function also construct frequent k-itemsets
+        and support count for each frequent k-itemsets.
+        """
+        # If fp tree is already contructed.
         if self.__fp_tree:
             pass
-        # Else construct fp tree
+        # Else construct fp tree.
         else:
             for i in range(self.__max_k):
                 self.__frequent_k_itemset[i+1] = set()
 
-            # convert to new transactions with only frequent 1-itemset
+            # Convert to new transactions and filter elements which are not frequent 1-itemset.
             new_transactions = []
             for transaction in self.__encoded_transactions:
                 new_transaction = []
@@ -216,7 +222,7 @@ class AssociationRuleMining:
                     new_transaction.sort(key=lambda item: self.support_count([self.__item_encoder.decode_to_string(item)]), reverse=True)
                     new_transactions.append(new_transaction)
 
-            # construct fp tree and header table
+            # Construct fp tree and header table.
             header_table = {}
             thread_table = {}
             for transaction in new_transactions:
@@ -236,7 +242,7 @@ class AssociationRuleMining:
                     parent_node = parent_node + ' ' + str(item)
                     current_node = current_node[item]['child']
 
-            # fp-growth
+            # Perform fp-growth
             for item, head_node in header_table.items():
                 counter = {}
 
