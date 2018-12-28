@@ -5,7 +5,6 @@ see test section for code example.
 """
 
 from encoder import StringToIntegerEncoder, ListToIntegerEncoder
-import json
 
 class AssociationRuleMining:
     """Generate association rule with FP-Growth algorithm.
@@ -201,6 +200,7 @@ class AssociationRuleMining:
         This function also construct frequent k-itemsets
         and support count for each frequent k-itemsets.
         """
+
         # If fp tree is already contructed.
         if self.__fp_tree:
             pass
@@ -219,7 +219,11 @@ class AssociationRuleMining:
                         new_transaction.append(item)
                 if new_transaction:
                     new_transaction.sort()
-                    new_transaction.sort(key=lambda item: self.support_count([self.__item_encoder.decode_to_string(item)]), reverse=True)
+                    new_transaction.sort(key=lambda item:
+                                         self.support_count([self
+                                                             .__item_encoder
+                                                             .decode_to_string(item)]),
+                                         reverse=True)
                     new_transactions.append(new_transaction)
 
             # Construct fp tree and header table.
@@ -242,35 +246,33 @@ class AssociationRuleMining:
                     parent_node = parent_node + ' ' + str(item)
                     current_node = current_node[item]['child']
 
-            # Perform fp-growth
+            # Perform fp-growth.
             for item, head_node in header_table.items():
                 counter = {}
 
+                # Build sub pattern tree.
                 while True:
                     if head_node['parent']:
-                        parents = map(int, head_node['parent'][1:].split(' '))
-                        for parent in parents:
-                            if parent in counter:
-                                counter[parent] = counter[parent] + head_node['value']
-                            else:
-                                counter[parent] = head_node['value']
+                        parents = list(map(int, head_node['parent'][1:].split(' ')))
+                        for k in range(len(parents)):
+                            for k_itemset in AssociationRuleMining.__enumerate_k_itemset(parents, k+1):
+                                encoded_k_1_itemset = self.__itemset_encoder.encode_from_list(k_itemset + [item])
+                                if encoded_k_1_itemset in counter:
+                                    counter[encoded_k_1_itemset] = counter[encoded_k_1_itemset] + head_node['value']
+                                else:
+                                    counter[encoded_k_1_itemset] = head_node['value']
+
                     if 'next' in head_node:
                         head_node = head_node['next']
                     else:
                         break
 
-                pattern = []
-                for parent, support_count in counter.items():
-                    if support_count >= self.__min_sup * self.__n_transactions:
-                        pattern.append(parent)
-
                 self.__frequent_k_itemset[1].add(self.__itemset_encoder.encode_from_list([item]))
-                for k in range(len(pattern)):
-                    for k_itemset in AssociationRuleMining.__enumerate_k_itemset(pattern, k+1):
-                        k_plus_1_itemset = k_itemset + [item]
-                        encoded_itemset = self.__itemset_encoder.encode_from_list(k_plus_1_itemset)
-                        self.__frequent_k_itemset[len(k_plus_1_itemset)].add(encoded_itemset)
-                        self.__sup_count[encoded_itemset] = min(map(lambda key: counter[key], k_itemset))
+
+                for encoded_itemset, count in counter.items():
+                    if count >= self.__min_sup * self.__n_transactions:
+                        self.__frequent_k_itemset[len(self.__itemset_encoder.decode_to_list(encoded_itemset))].add(encoded_itemset)
+                        self.__sup_count[encoded_itemset] = count
 
     def frequent_k_itemset(self, k=1):
         """Frequent k-itemset of the transactions.
@@ -380,11 +382,10 @@ if __name__ == '__main__':
     with open(DATA_PATH + DATA_NAME, 'r') as f:
         # Create instance.
         ARM = AssociationRuleMining(transactions=json.loads(f.read()),
-                                    min_sup=3/5,
+                                    min_sup=0.6,
                                     min_cof=0.5)
 
-        # ARM.construct_fp_tree()
-
+        ARM.construct_fp_tree()
 
         # Print support count for all frequent itemsets.
         for fi in ARM.frequent_itemset():

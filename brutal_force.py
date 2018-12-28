@@ -314,7 +314,7 @@ if __name__ == '__main__':
     with open(DATA_PATH + DATA_NAME, 'r') as f:
         # Create instance.
         ARM = AssociationRuleMining(transactions=json.loads(f.read()),
-                                    min_sup=3/5,
+                                    min_sup=0.4,
                                     min_cof=0.5)
 
         # Print support count for all frequent itemsets.

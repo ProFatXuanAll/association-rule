@@ -19,7 +19,7 @@ f = open(data_path + data_name, 'r')
 transactions = json.loads(f.read())
 f.close()
 
-min_sup = 3/5
+min_sup = 0.4
 min_cof = 0.5
 
 bf = brutal_force.AssociationRuleMining(transactions=transactions, min_sup=min_sup, min_cof=min_cof)
@@ -28,10 +28,14 @@ fp = fp_growth.AssociationRuleMining(transactions=transactions, min_sup=min_sup,
 
 print('brutal force versus apriori')
 frequent_itemset_compare(bf.frequent_itemset(), ap.frequent_itemset())
+frequent_itemset_compare(ap.frequent_itemset(), bf.frequent_itemset())
 association_rule_compare(bf.association_rules(), ap.association_rules())
+association_rule_compare(ap.association_rules(), bf.association_rules())
 print('same')
 
 print('brutal force versus fp-growth')
 frequent_itemset_compare(bf.frequent_itemset(), fp.frequent_itemset())
+frequent_itemset_compare(fp.frequent_itemset(), bf.frequent_itemset())
 association_rule_compare(bf.association_rules(), fp.association_rules())
+association_rule_compare(fp.association_rules(), bf.association_rules())
 print('same')
